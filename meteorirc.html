@@ -1,0 +1,29 @@
+<head>
+  <title>meteorirc</title>
+</head>
+
+<body>
+  {{>messages}}
+</body>
+
+<template name="messages">
+    <ul id="messages">
+        {{#each messages}}
+            {{>message}}
+        {{/each}}
+    </ul>
+</template>
+
+<template name="message">
+    <li class="message">
+        <span class="time">{{timeString time}}</span>
+        <span class="from">{{from}}:</span>
+        <span class="message">{{text}}</span>
+    </li>    
+   {{#ifDateChanged time}}
+        <li class="date">
+            {{dateString time}}
+        </li>
+    {{/ifDateChanged}}
+
+</template>
