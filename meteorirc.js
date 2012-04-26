@@ -14,7 +14,7 @@ if (Meteor.is_client) {
 
   var MessagesRouter = Backbone.Router.extend({
     routes: {
-      ":startMsg": "main"
+      "from/:startMsg": "main"
     },
 
     main: function(startFrom){
@@ -54,9 +54,11 @@ if (Meteor.is_client) {
     }
     Session.set('previousPage', prev);
     Session.set('messagesGte', cnt);
-    Session.set('messagesLt', cnt+PAGE);
-    var cursor = Messages.find({cnt: {$gte: cnt, $lt: (cnt+PAGE)}}, {sort: {time: -1}});
-    Session.set('messages', cursor);
+    var cntConds = {$gte: cnt};
+    if (startFrom){
+      cntConds['$lt'] = cnt+PAGE;
+    }
+    var cursor = Messages.find({cnt: cntConds}, {sort: {time: -1}});
     return cursor;
   };
 
