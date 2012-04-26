@@ -18,9 +18,9 @@
     <li class="message">
         <span class="time">{{timeString time}}</span>
         <span class="from">{{from}}:</span>
-        <span class="message">{{text}}</span>
+        <span class="message">{{#linkifyText}}{{/linkifyText}}</span>
     </li>    
-   {{#ifDateChanged time}}
+    {{#ifDateChanged time}}
         <li class="date">
             {{dateString time}}
         </li>
