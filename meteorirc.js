@@ -19,7 +19,7 @@ function getCntConditions(startFrom){
     }
   }
   var cntConds = {$gte: cnt};
-  if (startFrom && counter && startFrom < counter.val - PAGE){
+  if (startFrom && (!counter || startFrom < (counter.val - PAGE))){
     cntConds['$lt'] = cnt+PAGE;
   }
   return cntConds;
