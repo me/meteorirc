@@ -11,19 +11,31 @@
         {{#each messages}}
             {{>message}}
         {{/each}}
+        {{#lastMessageDate}}
+            <li class="date">
+                {{dateString time}}
+            </li>
+        {{/lastMessageDate}}
     </ul>
+    <div id="paginator">
+        {{#if previousPage}}
+            <a href="/{{previousPage}}">Previous</a>
+        {{/if}}
+        {{#if nextPage}}
+            <a href="/{{nextPage}}">Next</a>
+        {{/if}}
+    </div>
 </template>
 
 <template name="message">
+    {{#ifDateChanged time}}
+        <li class="date">
+            {{datePlusOneString time}}
+        </li>
+    {{/ifDateChanged}}
     <li class="message">
         <span class="time">{{timeString time}}</span>
         <span class="from">{{from}}:</span>
         <span class="message">{{#linkifyText}}{{/linkifyText}}</span>
     </li>    
-    {{#ifDateChanged time}}
-        <li class="date">
-            {{dateString time}}
-        </li>
-    {{/ifDateChanged}}
-
 </template>

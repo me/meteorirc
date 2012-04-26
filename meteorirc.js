@@ -1,79 +1,102 @@
+IRC_SERVER = 'irc.freenode.net';
+BOTNAME = 'meteor_logger';
+ROOM = '#meteor';
+
+PAGE = 100;
+
 Messages = new Meteor.Collection("messages");
+
+Counters = new Meteor.Collection("counters");
+
+
 
 if (Meteor.is_client) {
 
-  var lastDate;
+  var MessagesRouter = Backbone.Router.extend({
+    routes: {
+      ":startMsg": "main"
+    },
 
-  Handlebars.registerHelper('ifDateChanged', function(date, options){
-    if (date){
-      var d1 = new Date(date);  
+    main: function(startFrom){
+      if (startFrom){
+        startFrom = parseInt(startFrom, 10);
+      }
+      Session.set("startFrom", startFrom);
     }
-    if (lastDate){
-      var d2 = new Date(lastDate);  
-    }
-    lastDate = date;
-    if( !d1 || (d2 && d1.getFullYear() == d2.getFullYear() && d1.getMonth() == d2.getMonth() && d1.getDate() == d2.getDate()) ) {
-        return options.inverse(this);
-    } else {
-        return options.fn(this);
-    }
+
   });
 
-  Handlebars.registerHelper('dateString', function(val, options) {
-    if (!val) return "";
-    var d = new Date(val);
-    return d.toLocaleDateString();
-  });
+  Router = new MessagesRouter;
 
-  Handlebars.registerHelper('timeString', function(val, options) {
-    if (!val) return "";
-    var d = new Date(val);
-    var hours = d.getHours();
-    if (hours < 10){
-      hours = "0"+hours;
-    }
-    var minutes = d.getMinutes();
-    if (minutes < 10){
-      minutes = "0"+minutes;
-    }
-
-    return hours+":"+minutes;
-  });
-
-  Handlebars.registerHelper('linkifyText', function(options) {
-    var val = Handlebars._escape(this["text"]);
-
-    return Meteor.ui.chunk(function(){
-
-      var replaceText, replacePattern1, replacePattern2, replacePattern3;
-
-      //URLs starting with http://, https://, or ftp://
-      replacePattern1 = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gim;
-      replacedText = val.replace(replacePattern1, '<a href="$1" target="_blank">$1</a>');
-
-      //URLs starting with "www." (without // before it, or it'd re-link the ones done above).
-      replacePattern2 = /(^|[^\/])(www\.[\S]+(\b|$))/gim;
-      replacedText = replacedText.replace(replacePattern2, '$1<a href="http://$2" target="_blank">$2</a>');
-
-      //Change email addresses to mailto:: links.
-      replacePattern3 = /(\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,6})/gim;
-      replacedText = replacedText.replace(replacePattern3, '<a href="mailto:$1">$1</a>');
-
-      return replacedText;
-      
-    });
+  Meteor.startup(function () {
+    Backbone.history.start({pushState: true});
   });
 
   Template.messages.messages = function(){
-    return Messages.find({}, {sort: {time: -1}});
+    var cnt = 0;
+    lastDate = null;
+    var startFrom = Session.get('startFrom');
+    if (startFrom){
+      cnt = startFrom;
+    }
+    else{
+      var counter = Counters.findOne({name: 'messages'});
+      if (counter){
+        cnt = counter.val - PAGE + 1;
+      }
+    }
+    var prev = null;
+    if (cnt > 1){
+      prev = cnt - PAGE;
+      if (prev < 1){
+        prev = 1;
+      }
+    }
+    Session.set('previousPage', prev);
+    Session.set('messagesGte', cnt);
+    Session.set('messagesLt', cnt+PAGE);
+    var cursor = Messages.find({cnt: {$gte: cnt, $lt: (cnt+PAGE)}}, {sort: {time: -1}});
+    Session.set('messages', cursor);
+    return cursor;
+  };
+
+  Template.messages.previousPage = function(){
+    return Session.get('previousPage');
+  };
+
+  Template.messages.nextPage = function(){
+    var startFrom = Session.get('startFrom');
+    var counter = Counters.findOne({name: 'messages'});
+    if (startFrom && counter && startFrom < counter.val - PAGE){
+      return startFrom + PAGE;
+    }
+    else{
+      return null;
+    }
   };
 
 }
 
-if (Meteor.is_server) {
-  Meteor.default_server.method_handlers['/messages/insert'] = function () {};
-  Meteor.default_server.method_handlers['/messages/update'] = function () {};
-  Meteor.default_server.method_handlers['/messages/remove'] = function () {};
+if (Meteor.is_server) { 
+  _.each(['insert', 'update', 'remove'], function(act){
+    _.each(['messages', 'counters'], function(coll){
+      Meteor.default_server.method_handlers['/'+coll+'/'+act] = function () {};
+    });
+  });
+
+  var messageCnt = 1;
+  if (!Counters.findOne({name: 'messages'})){
+    
+    _.each(Messages.find({}, {sort: {time: 1}}).fetch(), function(msg){
+      Messages.update({_id: msg._id}, {$set: {cnt: messageCnt}});
+      messageCnt++;
+    });
+    Counters.insert({name: 'messages', val: messageCnt});
+    
+    
+  }
+
+
 
   var require = __meteor_bootstrap__.require;
   var path = require("path");
@@ -100,13 +123,14 @@ if (Meteor.is_server) {
     console.log("node_modules not found");
   }
   Meteor.startup(function () {
-    var client = new irc.Client('irc.freenode.net', 'meteor_logger', {
-      channels: ['#meteor']
-    });
+    var client = new irc.Client(IRC_SERVER, BOTNAME, {channels: [ROOM]});
     client.addListener('message', function (from, to, message) {
       Fiber(function(){
         // console.log(from + ' => ' + to + ': ' + message);
+        Counters.update({name: 'messages'}, {$inc: {val: 1}});
+        messageCnt = Counters.findOne({name: 'messages'}).val;
         Messages.insert({
+          cnt: messageCnt,
           time: new Date(),
           from: from, 
           to: to, 
