@@ -1,14 +1,29 @@
 IRC_SERVER = 'irc.freenode.net';
 BOTNAME = 'meteor_logger';
 ROOM = '#meteor';
-
 PAGE = 100;
 
 Messages = new Meteor.Collection("messages");
 
 Counters = new Meteor.Collection("counters");
 
-
+function getCntConditions(startFrom){
+  var cnt = 0;
+  if (startFrom){
+    cnt = startFrom;
+  }
+  else{
+    var counter = Counters.findOne({name: 'messages'});
+    if (counter){
+      cnt = counter.val - PAGE + 1;
+    }
+  }
+  var cntConds = {$gte: cnt};
+  if (startFrom && counter && startFrom < counter.val - PAGE){
+    cntConds['$lt'] = cnt+PAGE;
+  }
+  return cntConds;
+}
 
 if (Meteor.is_client) {
 
@@ -32,19 +47,18 @@ if (Meteor.is_client) {
     Backbone.history.start({pushState: true});
   });
 
-  Template.messages.messages = function(){
-    var cnt = 0;
-    lastDate = null;
+  Meteor.autosubscribe(function(){
     var startFrom = Session.get('startFrom');
-    if (startFrom){
-      cnt = startFrom;
-    }
-    else{
-      var counter = Counters.findOne({name: 'messages'});
-      if (counter){
-        cnt = counter.val - PAGE + 1;
-      }
-    }
+    Meteor.subscribe('messages', startFrom);
+  });
+
+  Meteor.subscribe('counters');
+
+  Template.messages.messages = function(){
+    
+    lastDate = null;
+    var range = getCntConditions(Session.get('startFrom'));
+    var cnt = range['$gte'];
     var prev = null;
     if (cnt > 1){
       prev = cnt - PAGE;
@@ -53,13 +67,7 @@ if (Meteor.is_client) {
       }
     }
     Session.set('previousPage', prev);
-    Session.set('messagesGte', cnt);
-    var cntConds = {$gte: cnt};
-    if (startFrom){
-      cntConds['$lt'] = cnt+PAGE;
-    }
-    var cursor = Messages.find({cnt: cntConds}, {sort: {time: -1}});
-    return cursor;
+    return Messages.find({}, {sort: {time: -1}});
   };
 
   Template.messages.previousPage = function(){
@@ -145,4 +153,15 @@ if (Meteor.is_server) {
     //   console.log(message);
     // });
   });
+
+
+  Meteor.publish('messages', function(startFrom){
+    var cntConds = getCntConditions(startFrom);
+    return Messages.find({cnt: cntConds}, {sort: {time: -1}});
+  });
+
+  Meteor.publish('counters', function(){
+    return Counters.find({});
+  });
+
 }

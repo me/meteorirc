@@ -18,10 +18,8 @@ if (Meteor.is_client){
   });
 
   Handlebars.registerHelper('lastMessageDate', function(options){
-    var messagesGte = Session.get('messagesGte');
-    if (messagesGte){
-      var msg = Messages.findOne({cnt: {$gte: messagesGte}}, {sort: {time: 1}});
-    }
+
+    var msg = Messages.findOne({}, {sort: {time: 1}});
     if (msg){
       return options.fn({time: msg.time});
     }
